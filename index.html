@@ -6,11 +6,11 @@
   <title>Name Extractor</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
   <style>
-    body { font-family: sans-serif; padding: 1rem; background: #f9f9f9; }
+    body { font-family: sans-serif; padding: 1rem; background: #f0f2f5; }
     .result-box { border: 1px solid #ccc; padding: 1rem; margin-top: 1rem; white-space: pre-wrap; background: #fff; position: relative; border-radius: 8px; }
     button.copy-btn { position: absolute; top: 10px; right: 10px; }
-    textarea { width: 100%; height: 150px; margin-top: 1rem; }
     #results { margin-top: 2rem; }
+    .error { color: red; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -29,6 +29,10 @@
       return `#${dd}${mm}#`;
     }
 
+    function cleanLine(line) {
+      return line.replace(/[^a-zA-Z0-9: ]/g, '').trim();
+    }
+
     async function processImages() {
       const files = document.getElementById('imageInput').files;
       const resultsDiv = document.getElementById('results');
@@ -40,30 +44,40 @@
         const resultBox = document.createElement('div');
         resultBox.className = 'result-box';
 
-        const text = await Tesseract.recognize(imgURL, 'eng', { logger: m => console.log(m) });
-        const lines = text.data.text.split('\n');
+        try {
+          const text = await Tesseract.recognize(imgURL, 'eng', { logger: m => console.log(m) });
+          const lines = text.data.text.split('\n').map(cleanLine);
 
-        let firstName = '';
-        let lastName = '';
+          let firstName = '';
+          let lastName = '';
 
-        for (let line of lines) {
-          if (line.toLowerCase().includes('ad')) {
-            firstName = line.split(':')[1]?.trim() || '';
+          for (let line of lines) {
+            if (line.toLowerCase().startsWith('adi') || line.toLowerCase().startsWith('ad')) {
+              const match = line.match(/ad[: ]+(.*)/i);
+              if (match) firstName = match[1].trim();
+            }
+            if (line.toLowerCase().startsWith('soyad')) {
+              const match = line.match(/soyad[: ]+(.*)/i);
+              if (match) lastName = match[1].trim();
+            }
           }
-          if (line.toLowerCase().includes('soyad')) {
-            lastName = line.split(':')[1]?.trim() || '';
+
+          if (!firstName && !lastName) {
+            resultBox.innerHTML = '<span class="error">⚠️ لم يتم استخراج الاسم من الصورة. تأكد من وضوحها.</span>';
+          } else {
+            const formatted = `${todayCode}\n\nFirst name:\n${firstName}\nLast name:\n${lastName}\n\nwestern union\nTurkey`;
+            resultBox.textContent = formatted;
+
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'copy-btn';
+            copyBtn.textContent = '📋 Copy';
+            copyBtn.onclick = () => navigator.clipboard.writeText(formatted);
+            resultBox.appendChild(copyBtn);
           }
+        } catch (error) {
+          resultBox.innerHTML = '<span class="error">❌ خطأ في معالجة الصورة.</span>';
         }
 
-        const formatted = `${todayCode}\n\nFirst name:\n${firstName}\nLast name:\n${lastName}\n\nwestern union\nTurkey`;
-        resultBox.textContent = formatted;
-
-        const copyBtn = document.createElement('button');
-        copyBtn.className = 'copy-btn';
-        copyBtn.textContent = '📋 Copy';
-        copyBtn.onclick = () => navigator.clipboard.writeText(formatted);
-
-        resultBox.appendChild(copyBtn);
         resultsDiv.appendChild(resultBox);
       }
     }
