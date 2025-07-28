@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Name Extractor</title>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 1rem; background: #f9f9f9; }
+    .result-box { border: 1px solid #ccc; padding: 1rem; margin-top: 1rem; white-space: pre-wrap; background: #fff; position: relative; border-radius: 8px; }
+    button.copy-btn { position: absolute; top: 10px; right: 10px; }
+    textarea { width: 100%; height: 150px; margin-top: 1rem; }
+    #results { margin-top: 2rem; }
+  </style>
+</head>
+<body>
+  <h3>Select Images</h3>
+  <input type="file" id="imageInput" multiple accept="image/*">
+  <button onclick="processImages()">Process</button>
+
+  <div id="results"></div>
+  <button onclick="copyAll()">📋 Copy All</button>
+
+  <script>
+    function getTodayCode() {
+      const today = new Date();
+      const dd = String(today.getDate()).padStart(2, '0');
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      return `#${dd}${mm}#`;
+    }
+
+    async function processImages() {
+      const files = document.getElementById('imageInput').files;
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = '';
+      const todayCode = getTodayCode();
+
+      for (const file of files) {
+        const imgURL = URL.createObjectURL(file);
+        const resultBox = document.createElement('div');
+        resultBox.className = 'result-box';
+
+        const text = await Tesseract.recognize(imgURL, 'eng', { logger: m => console.log(m) });
+        const lines = text.data.text.split('\n');
+
+        let firstName = '';
+        let lastName = '';
+
+        for (let line of lines) {
+          if (line.toLowerCase().includes('ad')) {
+            firstName = line.split(':')[1]?.trim() || '';
+          }
+          if (line.toLowerCase().includes('soyad')) {
+            lastName = line.split(':')[1]?.trim() || '';
+          }
+        }
+
+        const formatted = `${todayCode}\n\nFirst name:\n${firstName}\nLast name:\n${lastName}\n\nwestern union\nTurkey`;
+        resultBox.textContent = formatted;
+
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'copy-btn';
+        copyBtn.textContent = '📋 Copy';
+        copyBtn.onclick = () => navigator.clipboard.writeText(formatted);
+
+        resultBox.appendChild(copyBtn);
+        resultsDiv.appendChild(resultBox);
+      }
+    }
+
+    function copyAll() {
+      const boxes = document.querySelectorAll('.result-box');
+      let allText = '';
+      boxes.forEach(box => {
+        const copyBtn = box.querySelector('.copy-btn');
+        if (copyBtn) copyBtn.remove();
+        allText += box.textContent + '\n\n';
+      });
+      navigator.clipboard.writeText(allText.trim());
+      alert('All copied to clipboard!');
+    }
+  </script>
+</body>
+</html>
